@@ -2,6 +2,8 @@
 
 **Synthèse granulaire à couches, dans le navigateur.** Charge un son, et sculpte-le en grains : fige un instant, étire-le, superpose plusieurs lectures du même son jusqu'à obtenir une texture qu'on n'a jamais entendue.
 
+**▶ Essayer WAVR : https://olivierelbhar.github.io/wavr/**
+
 WAVR fait partie d'une collection d'outils audio vulgarisés (BREAKR, SCANR, TRACR, DRIFTR…) : une technique de production, un outil, une interface qui l'explique en jouant.
 
 > Statut : prototype en cours. Tout tient dans un seul fichier HTML, sans dépendance ni serveur.
