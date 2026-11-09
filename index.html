@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="WAVR : synthèse granulaire à couches, dans le navigateur. Charge un son et sculpte-le en grains.">
+<title>WAVR</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+[hidden]{display:none!important}
+body{margin:0}
+/* Layout: instrument panel. Wordmark bar, waveform "screen" full width, layer rack (one chip per preset family, each a live voice), then the fader modules of the selected layer. Single deliberate dark look. */
+:root{
+  --bg:#000;
+  --panel:#0b0b0b;
+  --raise:#1a1a1a;
+  --line:#2a2a2a;
+  --dim:#7d7d7d;
+  --fg:#f4f4f4;
+  --ink:#000;
+  --display:"Syne","Arial Black",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--mono);font-size:13px;line-height:1.5;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;border-bottom:1px solid var(--line);padding-bottom:14px}
+.brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(40px,8vw,76px);letter-spacing:-.02em;line-height:.85;margin:0}
+h1 span{display:inline-block;transform:scaleY(-1)}
+.tag{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.14em}
+.transport{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button,.filebtn{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.1em;background:transparent;color:var(--fg);border:1px solid var(--fg);padding:10px 16px;cursor:pointer;border-radius:0}
+button:hover,.filebtn:hover{background:var(--fg);color:var(--ink)}
+button:focus-visible,.filebtn:focus-within,input:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+#play{background:var(--fg);color:var(--ink);min-width:120px;font-weight:600}
+#play[aria-pressed="true"]{background:transparent;color:var(--fg)}
+.filebtn input{position:absolute;width:1px;height:1px;opacity:0}
+.filebtn{position:relative;display:inline-block}
+
+.screen{position:relative;border:1px solid var(--fg);background:var(--bg)}
+.screen-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line);font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em}
+.screen-head b{color:var(--fg);font-weight:600;text-transform:none;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60vw;display:inline-block;vertical-align:bottom}
+canvas{display:block;width:100%;height:220px;cursor:crosshair;touch-action:none}
+.drop{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.88);font-family:var(--display);font-size:28px;border:2px dashed var(--fg)}
+.screen-foot{display:flex;gap:20px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line);font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+.screen-foot span b{color:var(--fg);font-weight:400}
+
+.rack{display:flex;flex-direction:column;gap:10px}
+.rack-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px 16px;flex-wrap:wrap}
+.lbl{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.14em}
+.layers{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:flex;border:1px solid var(--line)}
+.chip button{border:none;font-size:11px;padding:8px 12px}
+.chip .name{min-width:84px;text-align:left}
+.chip .pw{border-left:1px solid var(--line);width:40px;padding:8px 0;color:var(--dim)}
+.chip .pw[aria-pressed="true"]{background:var(--fg);color:var(--ink)}
+.chip.sel{border-color:var(--fg)}
+.chip.sel .name{background:var(--raise)}
+.chip.sel .name::before{content:"▸ "}
+.chip button:hover{background:var(--fg);color:var(--ink)}
+.layer-head{display:flex;justify-content:space-between;align-items:center;gap:10px 16px;flex-wrap:wrap;border:1px solid var(--line);border-bottom:none;padding:10px 14px;background:var(--panel)}
+.layer-head h2{margin:0;font-family:var(--display);font-size:20px;letter-spacing:.01em}
+.layer-head h2 span{color:var(--dim);font-family:var(--mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.14em;margin-right:8px}
+.layer-head .acts{display:flex;gap:8px;flex-wrap:wrap}
+.layer-head .acts button{padding:7px 12px;font-size:11px;border-color:var(--line)}
+.layer-head .acts button:hover{border-color:var(--fg)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.mod{background:var(--panel);padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.mod-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.mod h3{margin:0;font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.02em;text-transform:uppercase}
+.val{font-variant-numeric:tabular-nums;font-size:13px}
+.mod p{margin:0;color:var(--dim);font-size:11.5px;line-height:1.45}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--line)}
+input[type=range]::-moz-range-track{height:2px;background:var(--line)}
+input[type=range]::-moz-range-progress{height:2px;background:var(--fg)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:22px;background:var(--fg);border:none;margin-top:-10px;border-radius:0}
+input[type=range]::-moz-range-thumb{width:14px;height:22px;background:var(--fg);border:none;border-radius:0}
+
+.fxgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.fx{background:var(--panel);padding:14px 14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.fx h3{margin:0;font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.02em;text-transform:uppercase}
+.fx .state{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+.fx.active .state{color:var(--fg)}
+.fx.active h3::after{content:" ●";font-size:10px;vertical-align:middle}
+.fx p{margin:0 0 4px;color:var(--dim);font-size:11.5px;line-height:1.45}
+.fx .row{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--dim);margin-top:4px}
+.fx .row b{color:var(--fg);font-weight:400;font-variant-numeric:tabular-nums}
+.sect{display:flex;justify-content:space-between;align-items:baseline;gap:8px 16px;flex-wrap:wrap;border:1px solid var(--line);border-bottom:none;padding:10px 14px;background:var(--panel)}
+.sect h2{margin:0;font-family:var(--display);font-size:20px}
+.sect h2 span{color:var(--dim);font-family:var(--mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.14em;margin-right:8px}
+.sect .lbl{text-transform:none;letter-spacing:0}
+
+.explain{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px 28px;border-top:1px solid var(--line);padding-top:18px}
+.explain h2{font-family:var(--display);font-size:20px;margin:0 0 6px;text-wrap:balance}
+.explain p{margin:0;color:var(--dim);max-width:62ch}
+.explain p b{color:var(--fg);font-weight:400}
+.note{font-size:11px;color:var(--dim)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>WA<span>V</span>R</h1>
+      <div class="tag">Synthèse granulaire<br>pour les curieux</div>
+    </div>
+    <div class="transport">
+      <label class="filebtn">Charger un son<input id="file" type="file" accept="audio/*"></label>
+      <button id="sample" type="button">Son d'exemple</button>
+      <button id="play" type="button" aria-pressed="false">▶ Jouer</button>
+    </div>
+  </header>
+
+  <section class="screen" id="screen">
+    <div class="screen-head"><span>Source · <b id="srcname">Exemple : break + nappe, 4 s</b></span><span>Clique ou glisse sur l'onde pour déplacer la tête de la couche choisie</span></div>
+    <canvas id="wave" aria-label="Forme d'onde. Clique pour placer la tête de lecture de la couche choisie."></canvas>
+    <div class="screen-foot">
+      <span>POS <b id="f-pos">0.000 s</b></span>
+      <span>COUCHES <b id="f-lay">1</b></span>
+      <span>GRAINS/S <b id="f-dens">0</b></span>
+      <span>ACTIFS <b id="f-act">0</b></span>
+      <span>DURÉE <b id="f-len">0.00 s</b></span>
+    </div>
+    <div class="drop" id="drop" hidden>Lâche ton fichier audio</div>
+  </section>
+
+  <section class="rack">
+    <div class="rack-top">
+      <span class="lbl">Couches · nom = régler · ON = entendre</span>
+      <span class="lbl" style="text-transform:none;letter-spacing:0">Chaque couche garde ses réglages. Toutes les couches allumées jouent ensemble.</span>
+    </div>
+    <div class="layers" id="layers"></div>
+  </section>
+
+  <div>
+    <div class="layer-head">
+      <h2><span>Réglages de</span><em id="selname" style="font-style:normal">Libre</em></h2>
+      <div class="acts">
+        <button type="button" id="solo">Solo</button>
+        <button type="button" id="allon">Tout allumer</button>
+        <button type="button" id="reset">Réinitialiser</button>
+      </div>
+    </div>
+    <section class="grid" id="grid"></section>
+  </div>
+
+  <div>
+    <div class="sect">
+      <h2><span>Effets de</span><em id="fxname" style="font-style:normal">Libre</em></h2>
+      <span class="lbl">Dans l'ordre du signal : saturation → flanger → phaser → écho → reverb. Dosage à 0 = effet coupé.</span>
+    </div>
+    <section class="fxgrid" id="fxgrid"></section>
+  </div>
+
+  <section class="explain">
+    <div>
+      <h2>Le principe</h2>
+      <p>La synthèse granulaire découpe un son en <b>grains</b> de quelques millisecondes, puis les rejoue par dizaines, à des endroits, des vitesses et des hauteurs différentes. Un seul grain est un clic. Des centaines forment une texture.</p>
+    </div>
+    <div>
+      <h2>Les couches</h2>
+      <p>Chaque famille (Nuage, Gel, Glitch…) est une <b>voix indépendante</b> avec sa propre tête de lecture et ses propres réglages, gardés quand tu passes à une autre. Allume-en plusieurs pour les superposer : un Nuage en fond, un Gel figé sur un accord, un Glitch par-dessus.</p>
+    </div>
+    <div>
+      <h2>Temps et hauteur séparés</h2>
+      <p>Sur un sampler classique, ralentir un son le rend plus grave. Ici, la <b>position</b> (où on lit) et la <b>hauteur</b> (à quelle vitesse on lit chaque grain) sont indépendantes. Tu peux figer un instant et le faire durer à l'infini.</p>
+    </div>
+    <div>
+      <h2>Par où commencer</h2>
+      <p>Lance la lecture, allume <b>Nuage</b> et <b>Gel</b>, puis sélectionne Gel et promène sa tête sur l'onde pendant que le nuage tourne derrière. Monte la <b>Dispersion</b> pour flouter, baisse la <b>Taille</b> sous 30 ms pour entendre le grain lui-même.</p>
+    </div>
+  </section>
+  <p class="note">Tout se passe dans ton navigateur : le fichier chargé n'est envoyé nulle part. Tes réglages de couches restent sur cet appareil.</p>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $=id=>document.getElementById(id);
+// Défilement: log scale both ways, with a freeze notch in the middle
+const SCAN_DEAD=0.04, SCAN_MIN=0.001, SCAN_MAX=4;
+const SCAN_UI={min:-1,max:1,step:0.001,
+  to:s=>{ const a=Math.abs(s); if(a<SCAN_MIN*0.999) return 0; const u=SCAN_DEAD+(1-SCAN_DEAD)*Math.log(Math.min(a,SCAN_MAX)/SCAN_MIN)/Math.log(SCAN_MAX/SCAN_MIN); return Math.sign(s)*u; },
+  from:u=>{ const a=Math.abs(u); if(a<SCAN_DEAD) return 0; const s=SCAN_MIN*Math.pow(SCAN_MAX/SCAN_MIN,(a-SCAN_DEAD)/(1-SCAN_DEAD)); return +(Math.sign(u)*s).toPrecision(3); }};
+function fmtScan(v){ const a=Math.abs(v); if(a<SCAN_MIN*0.999) return 'Gel'; const dir=v<0?'◀ ':'▶ ';
+  return dir+(a>=1?a.toFixed(a<2?2:1)+'×':'1/'+Math.round(1/a)); }
+const PARAMS = [
+  {id:'size',   name:'Taille',      min:5,   max:500, step:1,    v:90,  fmt:v=>v+' ms', d:"Durée de chaque grain. Court : grésillement et clics. Long : on reconnaît le son d'origine."},
+  {id:'density',name:'Densité',     min:1,   max:120, step:1,    v:28,  fmt:v=>v+' /s', d:"Nombre de grains lancés par seconde. Peu : rythme haché. Beaucoup : nappe continue."},
+  {id:'spray',  name:'Dispersion',  min:0,   max:1000,step:1,    v:60,  fmt:v=>'± '+v+' ms', d:"Chaque grain pioche un peu avant ou après la tête de lecture. Plus c'est large, plus c'est flou."},
+  {id:'scan',   name:'Défilement',  min:-4,  max:4,   step:0.0001, v:0.25, ui:SCAN_UI, fmt:fmtScan, d:"Vitesse de la tête dans le son. Centre = gel. Vers la droite : en avant, de 1/1000 à 4×. Vers la gauche : à l'envers. L'échelle est fine près du centre pour les ralentis extrêmes."},
+  {id:'sweep',  name:'Balayage',    min:0,   max:100, step:1,    v:0,   fmt:v=>v?'± '+v+' %':'Off', d:"La tête erre au hasard à gauche et à droite de sa position, en glissant d'un point à l'autre. Pourcentage de la longueur du son couvert."},
+  {id:'swrate', name:'Allure',      min:0.05,max:8,   step:0.01, v:0.5, fmt:v=>(+v).toFixed(2)+' Hz', d:"Nombre de nouvelles destinations par seconde pour le balayage. Lent : une dérive rêveuse. Rapide : des sauts nerveux."},
+  {id:'pitch',  name:'Hauteur',     min:-24, max:24,  step:1,    v:0,   fmt:v=>(v>0?'+':'')+v+' dt', d:"Transpose chaque grain en demi-tons, sans changer la vitesse de défilement."},
+  {id:'detune', name:'Désaccord',   min:0,   max:100, step:1,    v:8,   fmt:v=>'± '+v+' ct', d:"Variation aléatoire de hauteur par grain, en centièmes. Épaissit le son comme un chœur."},
+  {id:'reverse',name:'Inversion',   min:0,   max:100, step:1,    v:0,   fmt:v=>v+' %', d:"Probabilité qu'un grain soit lu à l'envers."},
+  {id:'width',  name:'Stéréo',      min:0,   max:100, step:1,    v:60,  fmt:v=>v+' %', d:"Éparpille les grains entre gauche et droite."},
+  {id:'shape',  name:'Enveloppe',   min:0,   max:100, step:1,    v:50,  fmt:v=>v<34?'Douce':v<67?'Cloche':'Sèche', d:"Forme du volume de chaque grain. Douce : fondu lisse. Sèche : attaque franche, plus percussif."},
+  {id:'jitter', name:'Irrégularité',min:0,   max:100, step:1,    v:10,  fmt:v=>v+' %', d:"Décale le moment où chaque grain part. 0 = mécanique, régulier. Haut = nuage organique."},
+  {id:'vol',    name:'Volume',      min:0,   max:100, step:1,    v:70,  fmt:v=>v+' %', d:"Niveau de cette couche dans le mélange, après ses effets."},
+];
+const pct=v=>Math.round(v)+' %';
+const FX = [
+  {id:'sat', name:'Saturation', d:"Pousse le signal dans le rouge, comme une bande ou une console. Ajoute du grain et de la chaleur.", ps:[
+    {id:'satmix', name:'Dosage',  min:0, max:100, step:1, v:0,  fmt:pct},
+    {id:'drive',  name:'Drive',   min:0, max:100, step:1, v:40, fmt:pct}]},
+  {id:'fl', name:'Flanger', d:"Mélange le son avec une copie très légèrement retardée qui varie. Effet de réacteur, de jet qui passe.", ps:[
+    {id:'flmix',  name:'Dosage',  min:0, max:100, step:1, v:0,  fmt:pct},
+    {id:'flrate', name:'Vitesse', min:0.05, max:5, step:0.01, v:0.3, fmt:v=>(+v).toFixed(2)+' Hz'},
+    {id:'flfb',   name:'Résonance', min:0, max:90, step:1, v:50, fmt:pct}]},
+  {id:'ph', name:'Phaser', d:"Creuse des encoches qui balaient le spectre. Le son tourne, ondule, comme sous l'eau.", ps:[
+    {id:'phmix',  name:'Dosage',  min:0, max:100, step:1, v:0,  fmt:pct},
+    {id:'phrate', name:'Vitesse', min:0.05, max:5, step:0.01, v:0.5, fmt:v=>(+v).toFixed(2)+' Hz'},
+    {id:'phdepth',name:'Profondeur', min:0, max:100, step:1, v:70, fmt:pct}]},
+  {id:'dl', name:'Écho', d:"Répète la couche en échos qui s'éteignent peu à peu. Chaque répétition est un peu plus sombre.", ps:[
+    {id:'dlmix',  name:'Dosage',  min:0, max:100, step:1, v:20, fmt:pct},
+    {id:'dltime', name:'Temps',   min:30, max:1000, step:1, v:375, fmt:v=>v+' ms'},
+    {id:'dlfb',   name:'Répétitions', min:0, max:90, step:1, v:55, fmt:pct}]},
+  {id:'rv', name:'Reverb', d:"Place la couche dans une pièce. Petite taille : une salle. Grande taille : une cathédrale.", ps:[
+    {id:'rvmix',  name:'Dosage',  min:0, max:100, step:1, v:0,  fmt:pct},
+    {id:'rvsize', name:'Taille',  min:0.5, max:8, step:0.5, v:2.5, fmt:v=>(+v).toFixed(1)+' s'}]},
+];
+const FXP=FX.flatMap(f=>f.ps);
+const ALLP=[...PARAMS,...FXP];
+const DEF={}; ALLP.forEach(p=>DEF[p.id]=p.v);
+
+const FAMILIES = [
+  {id:'libre',  name:'Libre',   p:{}},
+  {id:'nuage',  name:'Nuage',   p:{size:220,density:60,spray:400,scan:0.05,sweep:25,swrate:0.15,pitch:0,detune:25,reverse:20,width:90,shape:10,jitter:70,dlmix:35,dltime:450,rvmix:45,rvsize:4.5}},
+  {id:'gel',    name:'Gel',     p:{size:140,density:40,spray:20,scan:0,pitch:0,detune:6,reverse:0,width:70,shape:30,jitter:30,dlmix:25,phmix:35,phrate:0.15,rvmix:35,rvsize:3}},
+  {id:'glitch', name:'Glitch',  p:{size:18,density:22,spray:250,scan:1,sweep:60,swrate:4,pitch:0,detune:0,reverse:30,width:40,shape:90,jitter:0,satmix:45,drive:65,dlmix:15,dltime:125,dlfb:30}},
+  {id:'rewind', name:'Rewind',  p:{size:110,density:30,spray:30,scan:-1,pitch:0,detune:4,reverse:100,width:50,shape:50,jitter:10,flmix:45,flrate:0.2,flfb:60,dlmix:20}},
+  {id:'octaves',name:'Octaves', p:{size:180,density:45,spray:120,scan:0.15,pitch:12,detune:12,reverse:10,width:80,shape:25,jitter:40,dlmix:45,dltime:500,rvmix:40,rvsize:5.5}},
+  {id:'hasard', name:'Hasard',  p:null},
+];
+function randomParams(){
+  const r={}, rnd=p=>{ let v=p.min+Math.random()*(p.max-p.min); v=Math.round(v/p.step)*p.step; return +v.toFixed(2); };
+  PARAMS.forEach(p=>{ if(p.id!=='vol') r[p.id]=rnd(p); });
+  r.density=Math.max(r.density,8);
+  FX.forEach(f=>f.ps.forEach((p,i)=>{ r[p.id]= i===0 ? (Math.random()<0.5?0:Math.round(15+Math.random()*45)) : rnd(p); }));
+  return r;
+}
+function freshParams(f){ return {...DEF, ...(f.p||randomParams())}; }
+
+// ---------- audio ----------
+const ctx=new (window.AudioContext||window.webkitAudioContext)();
+const comp=ctx.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=4;
+const master=ctx.createGain(); master.gain.value=0.9;
+comp.connect(master); master.connect(ctx.destination);
+
+// ---------- per-layer effect chain ----------
+// each stage: input -> dry + effect(wet) -> output
+function stage(input,ein,eout){
+  const dry=ctx.createGain(), wet=ctx.createGain(), out=ctx.createGain();
+  input.connect(dry); dry.connect(out); input.connect(ein); eout.connect(wet); wet.connect(out);
+  wet.gain.value=0; return {dry,wet,out};
+}
+function lfo(rate,depth,target){ const o=ctx.createOscillator(), g=ctx.createGain(); o.frequency.value=rate; g.gain.value=depth; o.connect(g); g.connect(target); o.start(); return {o,g}; }
+const irCache={};
+function impulse(sec){
+  const k=sec.toFixed(1); if(irCache[k]) return irCache[k];
+  const sr=ctx.sampleRate, n=Math.floor(sr*sec), b=ctx.createBuffer(2,n,sr);
+  for(let c=0;c<2;c++){ const d=b.getChannelData(c); let lp=0;
+    for(let i=0;i<n;i++){ const t=i/n, damp=0.25+0.7*t; lp=lp*damp+(Math.random()*2-1)*(1-damp); d[i]=lp*Math.pow(1-t,2.2)*(i<sr*0.004?i/(sr*0.004):1); } }
+  return irCache[k]=b;
+}
+function satCurve(drive){
+  const k=1+drive/100*24, n=2048, c=new Float32Array(n), norm=Math.tanh(k);
+  for(let i=0;i<n;i++){ const x=i/(n-1)*2-1; c[i]=Math.tanh(k*x)/norm; } return c;
+}
+function buildChain(L){
+  const F={};
+  // saturation
+  F.shaper=ctx.createWaveShaper(); F.shaper.oversample='4x'; F.satTrim=ctx.createGain();
+  F.shaper.connect(F.satTrim);
+  F.sat=stage(L.in,F.shaper,F.satTrim);
+  // flanger
+  F.flDelay=ctx.createDelay(0.05); F.flDelay.delayTime.value=0.004; F.flFb=ctx.createGain();
+  F.flDelay.connect(F.flFb); F.flFb.connect(F.flDelay);
+  F.flLfo=lfo(0.3,0.0028,F.flDelay.delayTime);
+  F.fl=stage(F.sat.out,F.flDelay,F.flDelay);
+  // phaser: 4 all-pass filters swept by one LFO
+  F.ap=[]; let prev=null; const phIn=ctx.createGain();
+  for(let i=0;i<4;i++){ const a=ctx.createBiquadFilter(); a.type='allpass'; a.frequency.value=900; a.Q.value=0.7; (prev||phIn).connect(a); prev=a; F.ap.push(a); }
+  F.phLfo={o:ctx.createOscillator(),g:ctx.createGain()}; F.phLfo.o.frequency.value=0.5; F.phLfo.o.connect(F.phLfo.g);
+  F.ap.forEach(a=>F.phLfo.g.connect(a.frequency)); F.phLfo.o.start();
+  F.ph=stage(F.fl.out,phIn,prev);
+  // echo
+  F.dl=ctx.createDelay(1.5); F.dlFb=ctx.createGain(); F.dlTone=ctx.createBiquadFilter(); F.dlTone.type='lowpass'; F.dlTone.frequency.value=3200;
+  F.dl.connect(F.dlTone); F.dlTone.connect(F.dlFb); F.dlFb.connect(F.dl);
+  F.ec=stage(F.ph.out,F.dl,F.dlTone); F.ec.dry.gain.value=1;
+  // reverb
+  F.conv=ctx.createConvolver(); F.conv.normalize=true;
+  F.rv=stage(F.ec.out,F.conv,F.conv); F.rv.dry.gain.value=1;
+  F.rv.out.connect(L.out);
+  L.F=F;
+}
+
+let layers=FAMILIES.map((f,i)=>{
+  const L={id:f.id,name:f.name,fam:f,idx:i,P:freshParams(f),on:f.id==='libre',head:1.0+i*0.37,nextT:0,
+    in:ctx.createGain(),out:ctx.createGain()};
+  buildChain(L); L.out.connect(comp);
+  return L;
+});
+let sel=layers[0];
+
+// restore saved layers (per viewer, best effort)
+const KEY='wavr.layers.v1', OLD_KEY='switchr.layers.v1';
+try{
+  const s=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem(OLD_KEY)||'null');
+  if(s&&Array.isArray(s.layers)){
+    s.layers.forEach(d=>{ const L=layers.find(l=>l.id===d.id); if(!L) return;
+      ALLP.forEach(p=>{ const v=d.P&&d.P[p.id]; if(typeof v==='number'&&isFinite(v)) L.P[p.id]=Math.min(p.max,Math.max(p.min,v)); });
+      if(d.P && d.P.dlmix===undefined && typeof d.P.halo==='number') L.P.dlmix=d.P.halo;
+      L.on=!!d.on; if(typeof d.head==='number') L.head=d.head; });
+    sel=layers.find(l=>l.id===s.sel)||sel;
+  }
+}catch(e){}
+let saveT=0;
+function save(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{ localStorage.setItem(KEY,JSON.stringify({sel:sel.id,layers:layers.map(l=>({id:l.id,P:l.P,on:l.on,head:l.head}))})); }catch(e){} },300); }
+
+function applyLayerFx(L){
+  const t=ctx.currentTime, P=L.P, F=L.F, set=(prm,v)=>prm.setTargetAtTime(v,t,0.04);
+  set(L.out.gain, L.on?Math.pow(P.vol/100,1.6):0);
+  // saturation: crossfade, level-compensated
+  if(L._drive!==P.drive){ F.shaper.curve=satCurve(P.drive); L._drive=P.drive; }
+  const sm=P.satmix/100; set(F.sat.dry.gain,1-sm); set(F.sat.wet.gain,sm); set(F.satTrim.gain,1/(1+P.drive/100*1.6));
+  // flanger
+  const fm=P.flmix/100; set(F.fl.dry.gain,1-fm*0.35); set(F.fl.wet.gain,fm*0.8);
+  set(F.flLfo.o.frequency,P.flrate); set(F.flFb.gain,P.flfb/100*0.9);
+  // phaser
+  const pm=P.phmix/100; set(F.ph.dry.gain,1-pm*0.4); set(F.ph.wet.gain,pm*0.8);
+  set(F.phLfo.o.frequency,P.phrate); set(F.phLfo.g.gain,P.phdepth/100*800);
+  // echo
+  set(F.ec.wet.gain,P.dlmix/100*0.85); set(F.dl.delayTime,P.dltime/1000); set(F.dlFb.gain,P.dlfb/100*0.88);
+  // reverb: the impulse is only loaded when audible, so silent layers cost nothing
+  const want= L.on&&P.rvmix>0 ? impulse(P.rvsize) : null;
+  if(L._ir!==want){ F.conv.buffer=want; L._ir=want; }
+  set(F.rv.wet.gain,P.rvmix/100*1.1);
+}
+layers.forEach(applyLayerFx);
+
+// ---------- UI: faders bound to the selected layer ----------
+const grid=$('grid'), valEls={};
+PARAMS.forEach(p=>{
+  const m=document.createElement('div'); m.className='mod';
+  m.innerHTML=`<div class="mod-top"><h3><label for="k-${p.id}">${p.name}</label></h3><span class="val" id="v-${p.id}"></span></div>
+    <input type="range" id="k-${p.id}" min="${(p.ui||p).min}" max="${(p.ui||p).max}" step="${(p.ui||p).step}" value="${p.ui?p.ui.to(p.v):p.v}">
+    <p>${p.d}</p>`;
+  grid.appendChild(m);
+  const inp=m.querySelector('input');
+  valEls[p.id]=m.querySelector('.val');
+  inp.addEventListener('input',()=>setParam(p.id,p.ui?p.ui.from(+inp.value):+inp.value));
+  inp.addEventListener('dblclick',()=>{ const f=sel.fam.p; setParam(p.id, f&&f[p.id]!==undefined?f[p.id]:p.v); });
+});
+// effect modules
+const fxgrid=$('fxgrid'), fxCards={};
+FX.forEach(f=>{
+  const c=document.createElement('div'); c.className='fx';
+  c.innerHTML=`<div class="mod-top"><h3>${f.name}</h3><span class="state" id="st-${f.id}"></span></div><p>${f.d}</p>`+
+    f.ps.map(p=>`<div class="row"><label for="k-${p.id}">${p.name}</label><b id="v-${p.id}"></b></div>
+      <input type="range" id="k-${p.id}" min="${(p.ui||p).min}" max="${(p.ui||p).max}" step="${(p.ui||p).step}" value="${p.ui?p.ui.to(p.v):p.v}">`).join('');
+  fxgrid.appendChild(c); fxCards[f.id]=c;
+  f.ps.forEach(p=>{
+    valEls[p.id]=c.querySelector('#v-'+p.id);
+    const inp=c.querySelector('#k-'+p.id);
+    inp.addEventListener('input',()=>setParam(p.id,p.ui?p.ui.from(+inp.value):+inp.value));
+    inp.addEventListener('dblclick',()=>{ const fp=sel.fam.p; setParam(p.id, fp&&fp[p.id]!==undefined?fp[p.id]:p.v); });
+  });
+});
+function fxState(){ FX.forEach(f=>{ const m=sel.P[f.ps[0].id]; fxCards[f.id].classList.toggle('active',m>0); $('st-'+f.id).textContent=m>0?Math.round(m)+' %':'OFF'; }); }
+function setParam(id,v){
+  sel.P[id]=v;
+  const p=ALLP.find(x=>x.id===id);
+  valEls[id].textContent=p.fmt(v);
+  const inp=$('k-'+id), uv=p.ui?p.ui.to(v):v; if(Math.abs(+inp.value-uv)>1e-9) inp.value=uv;
+  if(id==='vol'||FXP.includes(p)){ applyLayerFx(sel); fxState(); }
+  save();
+}
+function syncFaders(){
+  ALLP.forEach(p=>{ $('k-'+p.id).value=p.ui?p.ui.to(sel.P[p.id]):sel.P[p.id]; valEls[p.id].textContent=p.fmt(sel.P[p.id]); });
+  $('selname').textContent=sel.name; $('fxname').textContent=sel.name; fxState();
+}
+
+// ---------- UI: layer chips ----------
+const layersEl=$('layers');
+layers.forEach(L=>{
+  const c=document.createElement('div'); c.className='chip'; c.dataset.l=L.id;
+  c.innerHTML=`<button type="button" class="name">${L.name}</button><button type="button" class="pw" aria-label="Entendre la couche ${L.name}">ON</button>`;
+  c.querySelector('.name').addEventListener('click',()=>{ selectLayer(L); if(!L.on) setOn(L,true); });
+  c.querySelector('.pw').addEventListener('click',()=>setOn(L,!L.on));
+  layersEl.appendChild(c); L.chip=c;
+});
+function renderChips(){
+  layers.forEach(L=>{ L.chip.classList.toggle('sel',L===sel); const pw=L.chip.querySelector('.pw'); pw.setAttribute('aria-pressed',L.on); pw.textContent=L.on?'ON':'OFF'; });
+  $('f-lay').textContent=layers.filter(l=>l.on).length;
+}
+function selectLayer(L){ sel=L; syncFaders(); renderChips(); save(); }
+function setOn(L,on){ L.on=on; if(on) L.nextT=ctx.currentTime+0.02; applyLayerFx(L); renderChips(); save(); }
+$('solo').addEventListener('click',()=>{ layers.forEach(l=>{ if(l!==sel&&l.on) setOn(l,false); }); if(!sel.on) setOn(sel,true); });
+$('allon').addEventListener('click',()=>layers.forEach(l=>{ if(!l.on) setOn(l,true); }));
+$('reset').addEventListener('click',()=>{ sel.P=freshParams(sel.fam); applyLayerFx(sel); syncFaders(); save(); });
+syncFaders(); renderChips();
+
+// ---------- source ----------
+let buf=null, rbuf=null;
+function setBuffer(b,name){
+  buf=b;
+  rbuf=ctx.createBuffer(b.numberOfChannels,b.length,b.sampleRate);
+  for(let c=0;c<b.numberOfChannels;c++){ const s=b.getChannelData(c), d=rbuf.getChannelData(c); for(let i=0,n=s.length;i<n;i++) d[i]=s[n-1-i]; }
+  layers.forEach(L=>{ L.head=((L.head%b.duration)+b.duration)%b.duration; });
+  $('srcname').textContent=name;
+  $('f-len').textContent=b.duration.toFixed(2)+' s';
+  buildPeaks();
+}
+function makeSample(){
+  const sr=ctx.sampleRate, len=Math.floor(sr*4), b=ctx.createBuffer(2,len,sr);
+  const L=b.getChannelData(0), R=b.getChannelData(1);
+  const s16=0.125;
+  let seed=7; const rnd=()=>{seed=(seed*16807)%2147483647; return seed/2147483647*2-1;};
+  const add=(t0,fn,dur,pan=0)=>{const a=Math.floor(t0*sr), n=Math.floor(dur*sr); for(let i=0;i<n&&a+i<len;i++){const v=fn(i/sr); L[a+i]+=v*(1-Math.max(0,pan)); R[a+i]+=v*(1+Math.min(0,pan));}};
+  const kick=t=>Math.sin(2*Math.PI*(45*t+ (110/18)*(1-Math.exp(-18*t))))*Math.exp(-7*t)*0.9;
+  const snare=t=>(rnd()*0.7*Math.exp(-16*t)+Math.sin(2*Math.PI*190*t)*0.4*Math.exp(-22*t))*0.7;
+  const hat=t=>rnd()*0.25*Math.exp(-60*t);
+  for(let bar=0;bar<2;bar++){
+    const o=bar*2;
+    [0,10,22].forEach(s=>add(o+s*s16,kick,0.5));
+    if(bar===1) add(o+7*s16,kick,0.5);
+    [4,12,20,28].forEach(s=>add(o+s*s16,snare,0.3,0.1));
+    [15,27].forEach(s=>add(o+s*s16,t=>snare(t)*0.35,0.2,-0.2));
+    for(let s=0;s<32;s+=2) add(o+s*s16,hat,0.08,s%4?0.4:-0.3);
+  }
+  [[220,261.63,329.63,392,493.88],[174.61,220,261.63,329.63,392]].forEach((ch,ci)=>ch.forEach((f,k)=>add(ci*2,t=>{
+    const env=Math.min(1,t/0.4)*Math.min(1,(2-t)/0.3);
+    return (Math.sin(2*Math.PI*f*t)+0.3*Math.sin(2*Math.PI*f*2.003*t)+0.15*Math.sin(2*Math.PI*f*3.01*t))*0.07*env*(1+0.2*Math.sin(2*Math.PI*0.7*t+k));
+  },2,(k-2)*0.25)));
+  let pk=0; for(let i=0;i<len;i++) pk=Math.max(pk,Math.abs(L[i]),Math.abs(R[i]));
+  const g=0.9/pk; for(let i=0;i<len;i++){L[i]*=g;R[i]*=g;}
+  return b;
+}
+
+// ---------- grains ----------
+const ENV_N=256, curves={};
+function envCurve(shape){
+  const c=new Float32Array(ENV_N), s=shape/100;
+  for(let i=0;i<ENV_N;i++){
+    const x=i/(ENV_N-1);
+    const hann=0.5-0.5*Math.cos(2*Math.PI*x);
+    const perc=Math.min(1,x/0.04)*Math.pow(1-x,2.2);
+    c[i]= s<0.5 ? Math.pow(hann, 1+(0.5-s)*2) : hann*(1-(s-0.5)*2)+perc*((s-0.5)*2);
+  }
+  c[0]=0;c[ENV_N-1]=0;return c;
+}
+function getCurve(shape){ const k=Math.round(shape/5); return curves[k]||(curves[k]=envCurve(k*5)); }
+
+let playing=false, lastTick=0, active=0;
+const spawnedWin=[], grains=[];
+function spawn(L,t,mix){
+  const P=L.P, D=buf.duration, dur=P.size/1000;
+  let pos=readPos(L)+(Math.random()*2-1)*P.spray/1000;
+  pos=((pos%D)+D)%D;
+  const rate=Math.pow(2,(P.pitch*100+(Math.random()*2-1)*P.detune)/1200);
+  const rev=Math.random()*100<P.reverse;
+  const span=dur*rate;
+  let off= rev?(D-pos):pos;
+  if(off+span>D) off=Math.max(0,D-span);
+  const src=ctx.createBufferSource(); src.buffer=rev?rbuf:buf; src.playbackRate.value=rate;
+  const g=ctx.createGain(); g.gain.value=0;
+  const amp=Math.min(0.9,1.6/Math.sqrt(Math.max(1,P.density*dur)))*mix;
+  const curve=getCurve(P.shape), c2=new Float32Array(curve.length); for(let i=0;i<c2.length;i++) c2[i]=curve[i]*amp;
+  try{ g.gain.setValueCurveAtTime(c2,t,dur); }catch(e){ g.gain.setValueAtTime(amp,t); }
+  let node=g;
+  if(ctx.createStereoPanner){ const pn=ctx.createStereoPanner(); pn.pan.value=(Math.random()*2-1)*P.width/100; g.connect(pn); node=pn; }
+  src.connect(g); node.connect(L.in);
+  src.start(t,off,span); src.stop(t+dur+0.02);
+  active++; src.onended=()=>{ active--; try{node.disconnect();g.disconnect();}catch(e){} };
+  grains.push({li:L.idx,pos,span,rev,born:performance.now()+(t-ctx.currentTime)*1000,life:Math.max(120,dur*1000),y:Math.random()});
+  spawnedWin.push(performance.now());
+}
+// random left/right sweep: smooth glides between random offsets around the head
+function wander(L,dt,D){
+  const w=L.w||(L.w={off:0,from:0,to:0,t:1});
+  const amp=L.P.sweep/100*D/2;
+  if(amp<=0){ w.off*=Math.pow(0.02,dt); w.from=w.to=w.off; w.t=1; return; }
+  w.t+=dt*L.P.swrate;
+  if(w.t>=1){ w.from=w.off; w.to=(Math.random()*2-1)*amp; w.t=0; }
+  const k=w.t*w.t*(3-2*w.t); w.off=w.from+(w.to-w.from)*k;
+}
+function readPos(L){ const D=buf?buf.duration:1, o=L.w?L.w.off:0; return ((L.head+o)%D+D)%D; }
+function tick(){
+  const now=ctx.currentTime, dt=Math.min(0.1,now-lastTick); lastTick=now;
+  if(!buf) return;
+  const D=buf.duration, on=layers.filter(l=>l.on), mix=Math.min(1,1.25/Math.sqrt(Math.max(1,on.length)));
+  for(const L of on){
+    if(playing && !(dragging&&L===sel)) L.head=((L.head+L.P.scan*dt)%D+D)%D;
+    if(playing) wander(L,dt,D);
+    if(!playing) continue;
+    if(L.nextT<now) L.nextT=now+0.01;
+    while(L.nextT<now+0.12){
+      spawn(L,L.nextT,mix);
+      L.nextT+=(1/L.P.density)*(1+(Math.random()*2-1)*L.P.jitter/100*0.95);
+    }
+  }
+}
+setInterval(tick,20);
+setInterval(()=>{ if(playing) save(); },2000);
+
+const playBtn=$('play');
+playBtn.addEventListener('click',async()=>{
+  if(ctx.state!=='running') await ctx.resume();
+  playing=!playing;
+  playBtn.setAttribute('aria-pressed',playing);
+  playBtn.textContent=playing?'■ Stop':'▶ Jouer';
+  lastTick=ctx.currentTime; layers.forEach(l=>l.nextT=ctx.currentTime+0.03);
+});
+document.addEventListener('keydown',e=>{ if(e.code==='Space'&&!/INPUT|BUTTON/.test(e.target.tagName)){ e.preventDefault(); playBtn.click(); }});
+
+// ---------- loading ----------
+async function loadFile(f){
+  if(!f) return;
+  $('srcname').textContent='Décodage…';
+  try{
+    const ab=await f.arrayBuffer();
+    const b=await new Promise((res,rej)=>{ const p=ctx.decodeAudioData(ab,res,rej); if(p&&p.catch) p.catch(rej); });
+    setBuffer(b,f.name);
+  }catch(e){ $('srcname').textContent='Format illisible. Essaie un WAV, MP3, OGG ou M4A.'; }
+}
+$('file').addEventListener('change',e=>loadFile(e.target.files[0]));
+$('sample').addEventListener('click',()=>setBuffer(makeSample(),"Exemple : break + nappe, 4 s"));
+const screen=$('screen'), drop=$('drop'); let dragDepth=0;
+screen.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;drop.hidden=false;});
+screen.addEventListener('dragover',e=>e.preventDefault());
+screen.addEventListener('dragleave',()=>{if(--dragDepth<=0){dragDepth=0;drop.hidden=true;}});
+screen.addEventListener('drop',e=>{e.preventDefault();dragDepth=0;drop.hidden=true;loadFile(e.dataTransfer.files[0]);});
+
+// ---------- drawing ----------
+const cv=$('wave'), g2=cv.getContext('2d');
+let W=0,H=0,dpr=1,peaks=null;
+function resize(){ dpr=window.devicePixelRatio||1; W=cv.clientWidth; H=cv.clientHeight; cv.width=W*dpr; cv.height=H*dpr; buildPeaks(); }
+function buildPeaks(){
+  if(!buf||!W) return;
+  const n=Math.floor(W), ch0=buf.getChannelData(0), ch1=buf.numberOfChannels>1?buf.getChannelData(1):ch0, per=ch0.length/n;
+  peaks=new Float32Array(n*2);
+  for(let x=0;x<n;x++){ let mn=0,mx=0; const a=Math.floor(x*per), e=Math.min(ch0.length,Math.floor((x+1)*per));
+    for(let i=a;i<e;i+=Math.max(1,(e-a)>>6)){ const v=(ch0[i]+ch1[i])*0.5; if(v<mn)mn=v; if(v>mx)mx=v; }
+    peaks[x*2]=mn; peaks[x*2+1]=mx; }
+}
+window.addEventListener('resize',resize);
+let dragging=false;
+function setHeadFromEvent(e){ if(!buf) return; const r=cv.getBoundingClientRect(); sel.head=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width))*buf.duration; }
+cv.addEventListener('pointerdown',e=>{dragging=true;cv.setPointerCapture(e.pointerId);setHeadFromEvent(e);});
+cv.addEventListener('pointermove',e=>{if(dragging)setHeadFromEvent(e);});
+const endDrag=()=>{ if(dragging){ dragging=false; save(); } };
+cv.addEventListener('pointerup',endDrag); cv.addEventListener('pointercancel',endDrag);
+
+function draw(){
+  g2.setTransform(dpr,0,0,dpr,0,0);
+  g2.fillStyle='#000'; g2.fillRect(0,0,W,H);
+  g2.fillStyle='#1c1c1c';
+  for(let i=1;i<16;i++) g2.fillRect(Math.round(W*i/16),0,1,H);
+  g2.fillRect(0,Math.round(H/2),W,1);
+  if(buf&&peaks){
+    const D=buf.duration, mid=H/2, amp=H*0.44;
+    if(sel.on||true){
+      const rp=readPos(sel), sx=(rp-sel.P.spray/1000)/D*W, ex=(rp+sel.P.spray/1000)/D*W;
+      g2.fillStyle='rgba(255,255,255,0.08)'; g2.fillRect(sx,0,Math.max(1,ex-sx),H);
+      if(sx<0) g2.fillRect(W+sx,0,-sx,H);
+      if(ex>W) g2.fillRect(0,0,ex-W,H);
+    }
+    g2.fillStyle='#8a8a8a';
+    const n=peaks.length/2;
+    for(let x=0;x<n;x++){ const y1=mid-peaks[x*2+1]*amp, y2=mid-peaks[x*2]*amp; g2.fillRect(x,y1,1,Math.max(1,y2-y1)); }
+    const now=performance.now();
+    for(let i=grains.length-1;i>=0;i--){
+      const gr=grains[i], age=now-gr.born;
+      if(age>gr.life+500){grains.splice(i,1);continue;}
+      if(age<0) continue;
+      const a=Math.max(0,1-age/(gr.life+500))*(gr.li===sel.idx?1:0.45);
+      const x=gr.pos/D*W, w=Math.max(2,gr.span/D*W), y=8+gr.y*(H-24);
+      g2.fillStyle=`rgba(255,255,255,${a})`;
+      g2.fillRect(gr.rev?x-w:x,y,w,a>0.6?6:3);
+    }
+    // heads: other active layers dimmed and labelled, selected one bright
+    g2.font='600 10px "JetBrains Mono", monospace'; g2.textBaseline='top';
+    for(const L of layers){
+      if(L===sel||!L.on) continue;
+      const hx=readPos(L)/D*W;
+      g2.fillStyle='rgba(244,244,244,0.4)'; g2.fillRect(Math.round(hx),0,1,H);
+      g2.fillStyle='rgba(244,244,244,0.7)'; g2.fillText(L.name.toUpperCase(),Math.min(W-60,hx+4),H-14);
+    }
+    const hx=readPos(sel)/D*W, bx=sel.head/D*W;
+    if(sel.P.sweep>0){ // where the head really is, and the sweep range around it
+      const rw=sel.P.sweep/100*W/2;
+      g2.fillStyle='rgba(244,244,244,0.25)'; g2.fillRect(Math.round(bx),H-10,1,10);
+      g2.fillRect(bx-rw,H-2,rw*2,1); if(bx-rw<0) g2.fillRect(W+bx-rw,H-2,rw-bx,1); if(bx+rw>W) g2.fillRect(0,H-2,bx+rw-W,1);
+    }
+    g2.fillStyle=sel.on?'#fff':'#7d7d7d'; g2.fillRect(Math.round(hx)-1,0,2,H);
+    g2.beginPath(); g2.moveTo(hx-6,0); g2.lineTo(hx+6,0); g2.lineTo(hx,8); g2.fill();
+    g2.fillText(sel.name.toUpperCase()+(sel.on?'':' · OFF'),Math.min(W-90,hx+8),2);
+    $('f-pos').textContent=sel.head.toFixed(3)+' s';
+  }
+  const t=performance.now(); while(spawnedWin.length&&t-spawnedWin[0]>1000) spawnedWin.shift();
+  $('f-dens').textContent=spawnedWin.length; $('f-act').textContent=active;
+  requestAnimationFrame(draw);
+}
+
+resize();
+setBuffer(makeSample(),"Exemple : break + nappe, 4 s");
+renderChips();
+requestAnimationFrame(draw);
+})();
+</script>
+
+</body>
+</html>

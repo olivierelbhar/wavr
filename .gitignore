@@ -1,0 +1,10 @@
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Sons de test : ne pas les publier (droits, poids)
+*.wav
+*.mp3
+*.m4a
+*.aif
+*.aiff
