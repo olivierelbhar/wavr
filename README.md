@@ -1,46 +1,46 @@
 # WAVR
 
-**Synthèse granulaire à couches, dans le navigateur.** Charge un son, et sculpte-le en grains : fige un instant, étire-le, superpose plusieurs lectures du même son jusqu'à obtenir une texture qu'on n'a jamais entendue.
+**Layered granular synthesis, in your browser.** Load a sound and sculpt it into grains: freeze a single moment, stretch it, stack several readings of the same sound until you get a texture nobody has heard before.
 
-**▶ Essayer WAVR : https://olivierelbhar.github.io/wavr/**
+**▶ Try WAVR: https://olivierelbhar.github.io/wavr/**
 
-WAVR fait partie d'une collection d'outils audio vulgarisés (BREAKR, SCANR, TRACR, DRIFTR…) : une technique de production, un outil, une interface qui l'explique en jouant.
+WAVR is part of a collection of playable audio tools (BREAKR, SCANR, TRACR, DRIFTR…): one production technique, one tool, one interface that teaches it while you play.
 
-> Statut : prototype en cours. Tout tient dans un seul fichier HTML, sans dépendance ni serveur.
+> Status: work-in-progress prototype. Everything lives in a single HTML file, with no dependencies and no server.
 
-## Essayer
+## Try it
 
-Ouvre `index.html` dans un navigateur récent (Chrome, Safari, Firefox), clique sur **▶ Jouer**. Un son d'exemple (un break et une nappe) est déjà chargé ; tu peux charger ou glisser ton propre fichier audio. Rien n'est envoyé nulle part : tout se passe dans le navigateur.
+Open the [live demo](https://olivierelbhar.github.io/wavr/), or open `index.html` in any recent browser (Chrome, Safari, Firefox), then hit **▶ Play**. An example sound (a breakbeat and a pad) is preloaded; load or drop your own audio file to make it yours. Nothing is uploaded: everything runs in the browser.
 
-## Le problème
+## The problem
 
-La synthèse granulaire produit des sons qu'aucune autre technique ne donne, mais les outils existants (plugins, machines comme le Torso S-4, apps comme GrainHeads) s'adressent à des sound designers qui maîtrisent déjà le vocabulaire : têtes de lecture, spray, enveloppes. Pour un curieux, la porte d'entrée est fermée.
+Granular synthesis produces sounds no other technique can, but existing tools (plugins, hardware like the Torso S-4, apps like GrainHeads) are built for sound designers who already speak the language: playheads, spray, envelopes. For a curious musician, the door is closed.
 
-## Les choix produit
+## Product decisions
 
-- **Des familles plutôt que des « têtes ».** Le multi-têtes existe ailleurs ; WAVR le présente comme des couches nommées (Nuage, Gel, Glitch, Rewind, Octaves, Hasard) qu'on allume et qu'on superpose. Chaque couche garde ses réglages en mémoire.
-- **Chaque réglage s'explique en une phrase**, au lieu d'un manuel.
-- **Zéro installation.** Un lien, un clic, du son. C'est ce qui rend l'outil partageable.
-- **Des échelles pensées pour l'oreille**, pas pour la technique : le défilement est logarithmique pour donner de la place aux ralentis extrêmes (jusqu'à 1/1000), là où se trouvent les sons intéressants.
+- **Families, not "playheads".** Multi-playhead granular exists elsewhere; WAVR frames it as named layers (Cloud, Freeze, Glitch, Rewind, Octaves, Random) you switch on and stack. Each layer remembers its own settings.
+- **Every control explains itself in one sentence**, instead of a manual.
+- **Zero install.** One link, one click, sound. That is what makes it shareable.
+- **Scales designed for the ear, not the engine.** Scan speed is logarithmic, so most of the slider is devoted to extreme slow motion (down to 1/1000), where the interesting sounds live.
 
-## Fonctionnalités
+## Features
 
-- 7 couches granulaires indépendantes, chacune avec sa tête de lecture
-- Par couche : taille, densité, dispersion, défilement (gel, ralenti, inversé), balayage aléatoire, hauteur, désaccord, inversion, stéréo, enveloppe, irrégularité, volume
-- Par couche, une chaîne d'effets : saturation → flanger → phaser → écho → reverb
-- Réglages mémorisés dans le navigateur
+- 7 independent granular layers, each with its own playhead
+- Per layer: size, density, spray, scan (freeze, slow motion, reverse), random sweep, pitch, detune, reverse, stereo width, envelope, jitter, volume
+- Per layer effects chain: saturation → flanger → phaser → echo → reverb
+- Settings saved in the browser
 
-## Feuille de route
+## Roadmap
 
-- [ ] Enregistrer : export WAV, puis vidéo courte pour le partage
-- [ ] Modulations (LFO assignables sur la position et la taille)
-- [ ] Jouer au clavier, une note = une couche transposée
-- [ ] Version plugin (VST/AU) pour les couches les plus utilisées
+- [ ] Record: WAV export, then short video clips for sharing
+- [ ] Modulation (assignable LFOs on position and size)
+- [ ] Keyboard play: one note = one transposed layer
+- [ ] Plugin version (VST3/AU) for the most-used layers
 
-## Technique
+## Under the hood
 
-HTML, CSS et JavaScript sans framework. Le son passe par la Web Audio API : chaque grain est un court extrait du fichier, joué avec sa propre enveloppe, sa hauteur et sa position stéréo.
+Plain HTML, CSS and JavaScript, no framework. Sound runs on the Web Audio API: each grain is a short slice of the file, played with its own envelope, pitch and stereo position.
 
 ---
 
-Un projet d'[Olivier Elbhar](https://olivierelbhar.com), product manager et producteur.
+Built by [Olivier Elbhar](https://olivierelbhar.com), product manager and music producer.

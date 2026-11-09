@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="WAVR : synthèse granulaire à couches, dans le navigateur. Charge un son et sculpte-le en grains.">
+<meta name="description" content="WAVR: layered granular synthesis in your browser. Load a sound and sculpt it into grains.">
 <title>WAVR</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -62,6 +62,8 @@ canvas{display:block;width:100%;height:220px;cursor:crosshair;touch-action:none}
 .chip.sel .name{background:var(--raise)}
 .chip.sel .name::before{content:"▸ "}
 .chip button:hover{background:var(--fg);color:var(--ink)}
+.chip.sel .name:hover{background:var(--fg);color:var(--ink)}
+.grid .mod:last-child{grid-column:1/-1}
 .layer-head{display:flex;justify-content:space-between;align-items:center;gap:10px 16px;flex-wrap:wrap;border:1px solid var(--line);border-bottom:none;padding:10px 14px;background:var(--panel)}
 .layer-head h2{margin:0;font-family:var(--display);font-size:20px;letter-spacing:.01em}
 .layer-head h2 span{color:var(--dim);font-family:var(--mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.14em;margin-right:8px}
@@ -82,6 +84,34 @@ input[type=range]::-moz-range-progress{height:2px;background:var(--fg)}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:22px;background:var(--fg);border:none;margin-top:-10px;border-radius:0}
 input[type=range]::-moz-range-thumb{width:14px;height:22px;background:var(--fg);border:none;border-radius:0}
 
+.panel-body{border:1px solid var(--line);border-top:none;background:var(--panel)}
+.help{display:flex;gap:10px;align-items:baseline;min-height:2.6em;padding:9px 14px;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--dim)}
+.help b{color:var(--fg);font-weight:600;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+.help span{min-width:0}
+.desk,.fxdesk{user-select:none;-webkit-user-select:none}
+.desk{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1px;background:var(--line)}
+.group{background:var(--panel);padding:12px 12px 14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.group h4,.fxbox h4{margin:0;font-size:10.5px;font-weight:400;color:var(--dim);text-transform:uppercase;letter-spacing:.16em;display:flex;justify-content:space-between;gap:8px}
+.knobs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 4px;justify-items:center}
+.knob{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;width:100%;user-select:none;-webkit-user-select:none}
+.knob .dial{width:54px;height:54px;border-radius:50%;cursor:ns-resize;touch-action:none;outline:none}
+.knob.sm .dial{width:44px;height:44px}
+.knob .dial:focus-visible{box-shadow:0 0 0 2px var(--fg)}
+.knob svg{width:100%;height:100%;display:block;overflow:visible}
+.knob .trk{fill:none;stroke:var(--line);stroke-width:3}
+.knob .arc{fill:none;stroke:var(--fg);stroke-width:3;stroke-linecap:butt}
+.knob .cap{fill:var(--raise);stroke:var(--line);stroke-width:1}
+.knob .ptr{stroke:var(--fg);stroke-width:2;stroke-linecap:round}
+.knob .nm{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);text-align:center;white-space:nowrap}
+.knob .vl{font-size:11px;color:var(--fg);font-variant-numeric:tabular-nums;text-align:center;white-space:nowrap}
+.knob:hover .nm,.knob.on .nm{color:var(--fg)}
+.fxdesk{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line)}
+.fxbox{background:var(--panel);padding:12px 10px 14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.fxbox h4 .st{color:var(--dim)}
+.fxbox.active h4{color:var(--fg)}
+.fxbox.active h4 .st{color:var(--fg)}
+.fxbox .knobs{grid-template-columns:repeat(3,1fr)}
+@media (max-width:520px){ .knobs{grid-template-columns:repeat(4,1fr)} .knob .dial{width:48px;height:48px} }
 .fxgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
 .fx{background:var(--panel);padding:14px 14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
 .fx h3{margin:0;font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.02em;text-transform:uppercase}
@@ -109,136 +139,136 @@ input[type=range]::-moz-range-thumb{width:14px;height:22px;background:var(--fg);
   <header>
     <div class="brand">
       <h1>WA<span>V</span>R</h1>
-      <div class="tag">Synthèse granulaire<br>pour les curieux</div>
+      <div class="tag">Granular synthesis<br>for the curious</div>
     </div>
     <div class="transport">
-      <label class="filebtn">Charger un son<input id="file" type="file" accept="audio/*"></label>
-      <button id="sample" type="button">Son d'exemple</button>
-      <button id="play" type="button" aria-pressed="false">▶ Jouer</button>
+      <label class="filebtn">Load a sound<input id="file" type="file" accept="audio/*"></label>
+      <button id="sample" type="button">Example sound</button>
+      <button id="play" type="button" aria-pressed="false">▶ Play</button>
     </div>
   </header>
 
   <section class="screen" id="screen">
-    <div class="screen-head"><span>Source · <b id="srcname">Exemple : break + nappe, 4 s</b></span><span>Clique ou glisse sur l'onde pour déplacer la tête de la couche choisie</span></div>
-    <canvas id="wave" aria-label="Forme d'onde. Clique pour placer la tête de lecture de la couche choisie."></canvas>
+    <div class="screen-head"><span>Source · <b id="srcname">Example: break + pad, 4 s</b></span><span>Click or drag on the waveform to move the selected layer's playhead</span></div>
+    <canvas id="wave" aria-label="Waveform. Click to place the selected layer's playhead."></canvas>
     <div class="screen-foot">
       <span>POS <b id="f-pos">0.000 s</b></span>
-      <span>COUCHES <b id="f-lay">1</b></span>
+      <span>LAYERS <b id="f-lay">1</b></span>
       <span>GRAINS/S <b id="f-dens">0</b></span>
-      <span>ACTIFS <b id="f-act">0</b></span>
-      <span>DURÉE <b id="f-len">0.00 s</b></span>
+      <span>ACTIVE <b id="f-act">0</b></span>
+      <span>LENGTH <b id="f-len">0.00 s</b></span>
     </div>
-    <div class="drop" id="drop" hidden>Lâche ton fichier audio</div>
+    <div class="drop" id="drop" hidden>Drop your audio file</div>
   </section>
 
   <section class="rack">
     <div class="rack-top">
-      <span class="lbl">Couches · nom = régler · ON = entendre</span>
-      <span class="lbl" style="text-transform:none;letter-spacing:0">Chaque couche garde ses réglages. Toutes les couches allumées jouent ensemble.</span>
+      <span class="lbl">Layers · name = edit · ON = hear</span>
+      <span class="lbl" style="text-transform:none;letter-spacing:0">Each layer keeps its own settings. Every layer that is on plays at once.</span>
     </div>
     <div class="layers" id="layers"></div>
   </section>
 
   <div>
     <div class="layer-head">
-      <h2><span>Réglages de</span><em id="selname" style="font-style:normal">Libre</em></h2>
+      <h2><span>Settings for</span><em id="selname" style="font-style:normal">Free</em></h2>
       <div class="acts">
         <button type="button" id="solo">Solo</button>
-        <button type="button" id="allon">Tout allumer</button>
-        <button type="button" id="reset">Réinitialiser</button>
+        <button type="button" id="allon">All on</button>
+        <button type="button" id="reset">Reset</button>
       </div>
     </div>
-    <section class="grid" id="grid"></section>
+    <div class="panel-body"><div class="help" id="help"><b>Tip</b><span>Hover a knob to see what it does. Drag up or down to turn it, double-click to reset. Hold Shift for fine moves.</span></div><section class="desk" id="grid"></section></div>
   </div>
 
   <div>
     <div class="sect">
-      <h2><span>Effets de</span><em id="fxname" style="font-style:normal">Libre</em></h2>
-      <span class="lbl">Dans l'ordre du signal : saturation → flanger → phaser → écho → reverb. Dosage à 0 = effet coupé.</span>
+      <h2><span>Effects for</span><em id="fxname" style="font-style:normal">Free</em></h2>
+      <span class="lbl">Saturation → flanger → phaser → echo → reverb</span>
     </div>
-    <section class="fxgrid" id="fxgrid"></section>
+    <div class="panel-body"><div class="help" id="fxhelp"><b>Effects</b><span>Hover an effect to see what it does. Amount at 0 turns it off.</span></div><section class="fxdesk" id="fxgrid"></section></div>
   </div>
 
   <section class="explain">
     <div>
-      <h2>Le principe</h2>
-      <p>La synthèse granulaire découpe un son en <b>grains</b> de quelques millisecondes, puis les rejoue par dizaines, à des endroits, des vitesses et des hauteurs différentes. Un seul grain est un clic. Des centaines forment une texture.</p>
+      <h2>How it works</h2>
+      <p>Granular synthesis cuts a sound into <b>grains</b> a few milliseconds long, then replays them by the dozen, from different places, at different speeds and pitches. One grain is a click. Hundreds become a texture.</p>
     </div>
     <div>
-      <h2>Les couches</h2>
-      <p>Chaque famille (Nuage, Gel, Glitch…) est une <b>voix indépendante</b> avec sa propre tête de lecture et ses propres réglages, gardés quand tu passes à une autre. Allume-en plusieurs pour les superposer : un Nuage en fond, un Gel figé sur un accord, un Glitch par-dessus.</p>
+      <h2>Layers</h2>
+      <p>Each family (Cloud, Freeze, Glitch…) is an <b>independent voice</b> with its own playhead and settings, kept when you switch to another. Turn several on to stack them: a Cloud in the background, a Freeze held on a chord, a Glitch on top.</p>
     </div>
     <div>
-      <h2>Temps et hauteur séparés</h2>
-      <p>Sur un sampler classique, ralentir un son le rend plus grave. Ici, la <b>position</b> (où on lit) et la <b>hauteur</b> (à quelle vitesse on lit chaque grain) sont indépendantes. Tu peux figer un instant et le faire durer à l'infini.</p>
+      <h2>Time and pitch, unlinked</h2>
+      <p>On a classic sampler, slowing a sound down makes it lower. Here, <b>position</b> (where you read) and <b>pitch</b> (how fast each grain is read) are independent. You can freeze a single moment and make it last forever.</p>
     </div>
     <div>
-      <h2>Par où commencer</h2>
-      <p>Lance la lecture, allume <b>Nuage</b> et <b>Gel</b>, puis sélectionne Gel et promène sa tête sur l'onde pendant que le nuage tourne derrière. Monte la <b>Dispersion</b> pour flouter, baisse la <b>Taille</b> sous 30 ms pour entendre le grain lui-même.</p>
+      <h2>Where to start</h2>
+      <p>Hit play, turn on <b>Cloud</b> and <b>Freeze</b>, then select Freeze and drag its playhead across the waveform while the cloud keeps turning behind it. Raise <b>Spray</b> to blur, drop <b>Size</b> under 30 ms to hear the grain itself.</p>
     </div>
   </section>
-  <p class="note">Tout se passe dans ton navigateur : le fichier chargé n'est envoyé nulle part. Tes réglages de couches restent sur cet appareil.</p>
+  <p class="note">Everything runs in your browser: your file is never uploaded anywhere. Your layer settings stay on this device.</p>
 </div>
 
 <script>
 (() => {
 'use strict';
 const $=id=>document.getElementById(id);
-// Défilement: log scale both ways, with a freeze notch in the middle
+// Scan: log scale both ways, with a freeze notch in the middle
 const SCAN_DEAD=0.04, SCAN_MIN=0.001, SCAN_MAX=4;
 const SCAN_UI={min:-1,max:1,step:0.001,
   to:s=>{ const a=Math.abs(s); if(a<SCAN_MIN*0.999) return 0; const u=SCAN_DEAD+(1-SCAN_DEAD)*Math.log(Math.min(a,SCAN_MAX)/SCAN_MIN)/Math.log(SCAN_MAX/SCAN_MIN); return Math.sign(s)*u; },
   from:u=>{ const a=Math.abs(u); if(a<SCAN_DEAD) return 0; const s=SCAN_MIN*Math.pow(SCAN_MAX/SCAN_MIN,(a-SCAN_DEAD)/(1-SCAN_DEAD)); return +(Math.sign(u)*s).toPrecision(3); }};
-function fmtScan(v){ const a=Math.abs(v); if(a<SCAN_MIN*0.999) return 'Gel'; const dir=v<0?'◀ ':'▶ ';
+function fmtScan(v){ const a=Math.abs(v); if(a<SCAN_MIN*0.999) return 'Freeze'; const dir=v<0?'◀ ':'▶ ';
   return dir+(a>=1?a.toFixed(a<2?2:1)+'×':'1/'+Math.round(1/a)); }
 const PARAMS = [
-  {id:'size',   name:'Taille',      min:5,   max:500, step:1,    v:90,  fmt:v=>v+' ms', d:"Durée de chaque grain. Court : grésillement et clics. Long : on reconnaît le son d'origine."},
-  {id:'density',name:'Densité',     min:1,   max:120, step:1,    v:28,  fmt:v=>v+' /s', d:"Nombre de grains lancés par seconde. Peu : rythme haché. Beaucoup : nappe continue."},
-  {id:'spray',  name:'Dispersion',  min:0,   max:1000,step:1,    v:60,  fmt:v=>'± '+v+' ms', d:"Chaque grain pioche un peu avant ou après la tête de lecture. Plus c'est large, plus c'est flou."},
-  {id:'scan',   name:'Défilement',  min:-4,  max:4,   step:0.0001, v:0.25, ui:SCAN_UI, fmt:fmtScan, d:"Vitesse de la tête dans le son. Centre = gel. Vers la droite : en avant, de 1/1000 à 4×. Vers la gauche : à l'envers. L'échelle est fine près du centre pour les ralentis extrêmes."},
-  {id:'sweep',  name:'Balayage',    min:0,   max:100, step:1,    v:0,   fmt:v=>v?'± '+v+' %':'Off', d:"La tête erre au hasard à gauche et à droite de sa position, en glissant d'un point à l'autre. Pourcentage de la longueur du son couvert."},
-  {id:'swrate', name:'Allure',      min:0.05,max:8,   step:0.01, v:0.5, fmt:v=>(+v).toFixed(2)+' Hz', d:"Nombre de nouvelles destinations par seconde pour le balayage. Lent : une dérive rêveuse. Rapide : des sauts nerveux."},
-  {id:'pitch',  name:'Hauteur',     min:-24, max:24,  step:1,    v:0,   fmt:v=>(v>0?'+':'')+v+' dt', d:"Transpose chaque grain en demi-tons, sans changer la vitesse de défilement."},
-  {id:'detune', name:'Désaccord',   min:0,   max:100, step:1,    v:8,   fmt:v=>'± '+v+' ct', d:"Variation aléatoire de hauteur par grain, en centièmes. Épaissit le son comme un chœur."},
-  {id:'reverse',name:'Inversion',   min:0,   max:100, step:1,    v:0,   fmt:v=>v+' %', d:"Probabilité qu'un grain soit lu à l'envers."},
-  {id:'width',  name:'Stéréo',      min:0,   max:100, step:1,    v:60,  fmt:v=>v+' %', d:"Éparpille les grains entre gauche et droite."},
-  {id:'shape',  name:'Enveloppe',   min:0,   max:100, step:1,    v:50,  fmt:v=>v<34?'Douce':v<67?'Cloche':'Sèche', d:"Forme du volume de chaque grain. Douce : fondu lisse. Sèche : attaque franche, plus percussif."},
-  {id:'jitter', name:'Irrégularité',min:0,   max:100, step:1,    v:10,  fmt:v=>v+' %', d:"Décale le moment où chaque grain part. 0 = mécanique, régulier. Haut = nuage organique."},
-  {id:'vol',    name:'Volume',      min:0,   max:100, step:1,    v:70,  fmt:v=>v+' %', d:"Niveau de cette couche dans le mélange, après ses effets."},
+  {id:'size',   name:'Size',        min:5,   max:500, step:1,    v:90,  fmt:v=>v+' ms', d:"Length of each grain. Short: crackle and clicks. Long: you recognise the original sound."},
+  {id:'density',name:'Density',     min:1,   max:120, step:1,    v:28,  fmt:v=>v+' /s', d:"Grains fired per second. Few: a choppy rhythm. Many: a continuous wash."},
+  {id:'spray',  name:'Spray',       min:0,   max:1000,step:1,    v:60,  fmt:v=>'± '+v+' ms', d:"Each grain picks a spot a little before or after the playhead. The wider it is, the blurrier the sound."},
+  {id:'scan',   name:'Scan',        min:-4,  max:4,   step:0.0001, v:0.25, ui:SCAN_UI, fmt:fmtScan, d:"How fast the playhead moves through the sound. Centre = freeze. Right: forward, from 1/1000 to 4×. Left: backwards. The scale is finest near the centre, for extreme slow motion."},
+  {id:'sweep',  name:'Sweep',       min:0,   max:100, step:1,    v:0,   fmt:v=>v?'± '+v+' %':'Off', d:"The playhead wanders randomly left and right of its position, gliding from one spot to the next. Percentage of the sound's length it can cover."},
+  {id:'swrate', name:'Pace',        min:0.05,max:8,   step:0.01, v:0.5, fmt:v=>(+v).toFixed(2)+' Hz', d:"New sweep destinations per second. Slow: a dreamy drift. Fast: nervous jumps."},
+  {id:'pitch',  name:'Pitch',       min:-24, max:24,  step:1,    v:0,   fmt:v=>(v>0?'+':'')+v+' st', d:"Transposes every grain in semitones, without changing the scan speed."},
+  {id:'detune', name:'Detune',      min:0,   max:100, step:1,    v:8,   fmt:v=>'± '+v+' ct', d:"Random pitch drift per grain, in cents. Thickens the sound like a choir."},
+  {id:'reverse',name:'Reverse',     min:0,   max:100, step:1,    v:0,   fmt:v=>v+' %', d:"Chance that a grain plays backwards."},
+  {id:'width',  name:'Width',       min:0,   max:100, step:1,    v:60,  fmt:v=>v+' %', d:"Scatters grains between left and right."},
+  {id:'shape',  name:'Envelope',    min:0,   max:100, step:1,    v:50,  fmt:v=>v<34?'Soft':v<67?'Bell':'Sharp', d:"The volume shape of each grain. Soft: a smooth fade. Sharp: a hard attack, more percussive."},
+  {id:'jitter', name:'Jitter',      min:0,   max:100, step:1,    v:10,  fmt:v=>v+' %', d:"Shifts when each grain starts. 0 = mechanical, regular. High = an organic cloud."},
+  {id:'vol',    name:'Volume',      min:0,   max:100, step:1,    v:70,  fmt:v=>v+' %', d:"This layer's level in the mix, after its effects."},
 ];
 const pct=v=>Math.round(v)+' %';
 const FX = [
-  {id:'sat', name:'Saturation', d:"Pousse le signal dans le rouge, comme une bande ou une console. Ajoute du grain et de la chaleur.", ps:[
-    {id:'satmix', name:'Dosage',  min:0, max:100, step:1, v:0,  fmt:pct},
+  {id:'sat', name:'Saturation', d:"Pushes the signal into the red, like tape or a mixing desk. Adds grit and warmth.", ps:[
+    {id:'satmix', name:'Amount',  min:0, max:100, step:1, v:0,  fmt:pct},
     {id:'drive',  name:'Drive',   min:0, max:100, step:1, v:40, fmt:pct}]},
-  {id:'fl', name:'Flanger', d:"Mélange le son avec une copie très légèrement retardée qui varie. Effet de réacteur, de jet qui passe.", ps:[
-    {id:'flmix',  name:'Dosage',  min:0, max:100, step:1, v:0,  fmt:pct},
-    {id:'flrate', name:'Vitesse', min:0.05, max:5, step:0.01, v:0.3, fmt:v=>(+v).toFixed(2)+' Hz'},
-    {id:'flfb',   name:'Résonance', min:0, max:90, step:1, v:50, fmt:pct}]},
-  {id:'ph', name:'Phaser', d:"Creuse des encoches qui balaient le spectre. Le son tourne, ondule, comme sous l'eau.", ps:[
-    {id:'phmix',  name:'Dosage',  min:0, max:100, step:1, v:0,  fmt:pct},
-    {id:'phrate', name:'Vitesse', min:0.05, max:5, step:0.01, v:0.5, fmt:v=>(+v).toFixed(2)+' Hz'},
-    {id:'phdepth',name:'Profondeur', min:0, max:100, step:1, v:70, fmt:pct}]},
-  {id:'dl', name:'Écho', d:"Répète la couche en échos qui s'éteignent peu à peu. Chaque répétition est un peu plus sombre.", ps:[
-    {id:'dlmix',  name:'Dosage',  min:0, max:100, step:1, v:20, fmt:pct},
-    {id:'dltime', name:'Temps',   min:30, max:1000, step:1, v:375, fmt:v=>v+' ms'},
-    {id:'dlfb',   name:'Répétitions', min:0, max:90, step:1, v:55, fmt:pct}]},
-  {id:'rv', name:'Reverb', d:"Place la couche dans une pièce. Petite taille : une salle. Grande taille : une cathédrale.", ps:[
-    {id:'rvmix',  name:'Dosage',  min:0, max:100, step:1, v:0,  fmt:pct},
-    {id:'rvsize', name:'Taille',  min:0.5, max:8, step:0.5, v:2.5, fmt:v=>(+v).toFixed(1)+' s'}]},
+  {id:'fl', name:'Flanger', d:"Blends the sound with a very slightly delayed, moving copy. The jet-plane whoosh.", ps:[
+    {id:'flmix',  name:'Amount',  min:0, max:100, step:1, v:0,  fmt:pct},
+    {id:'flrate', name:'Rate',    min:0.05, max:5, step:0.01, v:0.3, fmt:v=>(+v).toFixed(2)+' Hz'},
+    {id:'flfb',   name:'Resonance', min:0, max:90, step:1, v:50, fmt:pct}]},
+  {id:'ph', name:'Phaser', d:"Carves notches that sweep across the spectrum. The sound swirls and ripples, as if under water.", ps:[
+    {id:'phmix',  name:'Amount',  min:0, max:100, step:1, v:0,  fmt:pct},
+    {id:'phrate', name:'Rate',    min:0.05, max:5, step:0.01, v:0.5, fmt:v=>(+v).toFixed(2)+' Hz'},
+    {id:'phdepth',name:'Depth',   min:0, max:100, step:1, v:70, fmt:pct}]},
+  {id:'dl', name:'Echo', d:"Repeats the layer in echoes that slowly fade. Each repeat is a little darker.", ps:[
+    {id:'dlmix',  name:'Amount',  min:0, max:100, step:1, v:20, fmt:pct},
+    {id:'dltime', name:'Time',    min:30, max:1000, step:1, v:375, fmt:v=>v+' ms'},
+    {id:'dlfb',   name:'Repeats', min:0, max:90, step:1, v:55, fmt:pct}]},
+  {id:'rv', name:'Reverb', d:"Puts the layer in a space. Small: a room. Large: a cathedral.", ps:[
+    {id:'rvmix',  name:'Amount',  min:0, max:100, step:1, v:0,  fmt:pct},
+    {id:'rvsize', name:'Size',    min:0.5, max:8, step:0.5, v:2.5, fmt:v=>(+v).toFixed(1)+' s'}]},
 ];
 const FXP=FX.flatMap(f=>f.ps);
 const ALLP=[...PARAMS,...FXP];
 const DEF={}; ALLP.forEach(p=>DEF[p.id]=p.v);
 
 const FAMILIES = [
-  {id:'libre',  name:'Libre',   p:{}},
-  {id:'nuage',  name:'Nuage',   p:{size:220,density:60,spray:400,scan:0.05,sweep:25,swrate:0.15,pitch:0,detune:25,reverse:20,width:90,shape:10,jitter:70,dlmix:35,dltime:450,rvmix:45,rvsize:4.5}},
-  {id:'gel',    name:'Gel',     p:{size:140,density:40,spray:20,scan:0,pitch:0,detune:6,reverse:0,width:70,shape:30,jitter:30,dlmix:25,phmix:35,phrate:0.15,rvmix:35,rvsize:3}},
+  {id:'libre',  name:'Free',    p:{}},
+  {id:'nuage',  name:'Cloud',   p:{size:220,density:60,spray:400,scan:0.05,sweep:25,swrate:0.15,pitch:0,detune:25,reverse:20,width:90,shape:10,jitter:70,dlmix:35,dltime:450,rvmix:45,rvsize:4.5}},
+  {id:'gel',    name:'Freeze',   p:{size:140,density:40,spray:20,scan:0,pitch:0,detune:6,reverse:0,width:70,shape:30,jitter:30,dlmix:25,phmix:35,phrate:0.15,rvmix:35,rvsize:3}},
   {id:'glitch', name:'Glitch',  p:{size:18,density:22,spray:250,scan:1,sweep:60,swrate:4,pitch:0,detune:0,reverse:30,width:40,shape:90,jitter:0,satmix:45,drive:65,dlmix:15,dltime:125,dlfb:30}},
   {id:'rewind', name:'Rewind',  p:{size:110,density:30,spray:30,scan:-1,pitch:0,detune:4,reverse:100,width:50,shape:50,jitter:10,flmix:45,flrate:0.2,flfb:60,dlmix:20}},
   {id:'octaves',name:'Octaves', p:{size:180,density:45,spray:120,scan:0.15,pitch:12,detune:12,reverse:10,width:80,shape:25,jitter:40,dlmix:45,dltime:500,rvmix:40,rvsize:5.5}},
-  {id:'hasard', name:'Hasard',  p:null},
+  {id:'hasard', name:'Random',  p:null},
 ];
 function randomParams(){
   const r={}, rnd=p=>{ let v=p.min+Math.random()*(p.max-p.min); v=Math.round(v/p.step)*p.step; return +v.toFixed(2); };
@@ -347,45 +377,69 @@ function applyLayerFx(L){
 }
 layers.forEach(applyLayerFx);
 
-// ---------- UI: faders bound to the selected layer ----------
-const grid=$('grid'), valEls={};
-PARAMS.forEach(p=>{
-  const m=document.createElement('div'); m.className='mod';
-  m.innerHTML=`<div class="mod-top"><h3><label for="k-${p.id}">${p.name}</label></h3><span class="val" id="v-${p.id}"></span></div>
-    <input type="range" id="k-${p.id}" min="${(p.ui||p).min}" max="${(p.ui||p).max}" step="${(p.ui||p).step}" value="${p.ui?p.ui.to(p.v):p.v}">
-    <p>${p.d}</p>`;
-  grid.appendChild(m);
-  const inp=m.querySelector('input');
-  valEls[p.id]=m.querySelector('.val');
-  inp.addEventListener('input',()=>setParam(p.id,p.ui?p.ui.from(+inp.value):+inp.value));
-  inp.addEventListener('dblclick',()=>{ const f=sel.fam.p; setParam(p.id, f&&f[p.id]!==undefined?f[p.id]:p.v); });
+// ---------- UI: mixer knobs bound to the selected layer ----------
+const valEls={}, KN={};
+const GROUPS=[['Grain',['size','density','shape','jitter']],['Playhead',['scan','spray','sweep','swrate']],['Tone',['pitch','detune','reverse','width']],['Output',['vol']]];
+function help(box,title,text){ box.innerHTML=`<b>${title}</b><span>${text}</span>`; }
+function famValue(p){ const f=sel.fam.p; return f&&f[p.id]!==undefined?f[p.id]:p.v; }
+function makeKnob(host,p,small,helpBox,helpText){
+  const u=p.ui||p, A0=-135, A1=135, R=small?19:23, C=small?22:27, S=C*2;
+  const el=document.createElement('div'); el.className='knob'+(small?' sm':'');
+  el.innerHTML=`<div class="dial" tabindex="0" role="slider" aria-label="${p.name}"><svg viewBox="0 0 ${S} ${S}">
+    <path class="trk"/><path class="arc"/><circle class="cap" cx="${C}" cy="${C}" r="${R-6}"/><line class="ptr" x1="${C}" y1="${C}"/></svg></div>
+    <span class="nm">${p.name}</span><span class="vl"></span>`;
+  host.appendChild(el);
+  const dial=el.querySelector('.dial'), arc=el.querySelector('.arc'), ptr=el.querySelector('.ptr');
+  const pol=(a,r)=>{ const t=(a-90)*Math.PI/180; return [C+r*Math.cos(t), C+r*Math.sin(t)]; };
+  const path=(a1,a2)=>{ if(a2<a1)[a1,a2]=[a2,a1]; if(a2-a1<0.5) return ''; const [x1,y1]=pol(a1,R),[x2,y2]=pol(a2,R); return `M${x1} ${y1} A${R} ${R} 0 ${a2-a1>180?1:0} 1 ${x2} ${y2}`; };
+  el.querySelector('.trk').setAttribute('d',path(A0,A1));
+  const bip=u.min<0, angOf=uv=>A0+(A1-A0)*(uv-u.min)/(u.max-u.min);
+  let uv=0;
+  const draw=v=>{ uv=p.ui?p.ui.to(v):v; const a=angOf(uv);
+    arc.setAttribute('d', bip?path(angOf(0),a):path(A0,a));
+    const [x,y]=pol(a,R-9); ptr.setAttribute('x2',x); ptr.setAttribute('y2',y);
+    valEls[p.id].textContent=p.fmt(v); dial.setAttribute('aria-valuetext',p.fmt(v)); };
+  valEls[p.id]=el.querySelector('.vl');
+  const setU=nu=>{ nu=Math.min(u.max,Math.max(u.min,Math.round(nu/u.step)*u.step)); setParam(p.id,p.ui?p.ui.from(nu):+nu.toFixed(6)); };
+  let drag=null;
+  dial.addEventListener('pointerdown',e=>{ dial.setPointerCapture(e.pointerId); drag={y:e.clientY,u:uv}; el.classList.add('on'); dial.focus(); });
+  dial.addEventListener('pointermove',e=>{ if(!drag) return; const k=e.shiftKey?900:200; setU(drag.u+(drag.y-e.clientY)/k*(u.max-u.min)); });
+  const end=()=>{ drag=null; el.classList.remove('on'); }; dial.addEventListener('pointerup',end); dial.addEventListener('pointercancel',end);
+  dial.addEventListener('wheel',e=>{ e.preventDefault(); setU(uv+(e.deltaY<0?1:-1)*(u.max-u.min)/(e.shiftKey?400:60)); },{passive:false});
+  dial.addEventListener('keydown',e=>{ const st=(u.max-u.min)/(e.shiftKey?400:60);
+    if(e.key==='ArrowUp'||e.key==='ArrowRight'){ e.preventDefault(); setU(uv+st); }
+    if(e.key==='ArrowDown'||e.key==='ArrowLeft'){ e.preventDefault(); setU(uv-st); } });
+  dial.addEventListener('dblclick',()=>setParam(p.id,famValue(p)));
+  const show=()=>help(helpBox,helpText?helpText.t:p.name,helpText?helpText.d:p.d);
+  el.addEventListener('pointerenter',show); dial.addEventListener('focus',show);
+  KN[p.id]=draw;
+}
+const grid=$('grid'), helpBox=$('help'), fxHelp=$('fxhelp');
+GROUPS.forEach(([title,ids])=>{
+  const g=document.createElement('div'); g.className='group'; g.innerHTML=`<h4>${title}</h4><div class="knobs"></div>`;
+  grid.appendChild(g); const k=g.querySelector('.knobs');
+  ids.forEach(id=>makeKnob(k,PARAMS.find(p=>p.id===id),false,helpBox));
 });
 // effect modules
 const fxgrid=$('fxgrid'), fxCards={};
 FX.forEach(f=>{
-  const c=document.createElement('div'); c.className='fx';
-  c.innerHTML=`<div class="mod-top"><h3>${f.name}</h3><span class="state" id="st-${f.id}"></span></div><p>${f.d}</p>`+
-    f.ps.map(p=>`<div class="row"><label for="k-${p.id}">${p.name}</label><b id="v-${p.id}"></b></div>
-      <input type="range" id="k-${p.id}" min="${(p.ui||p).min}" max="${(p.ui||p).max}" step="${(p.ui||p).step}" value="${p.ui?p.ui.to(p.v):p.v}">`).join('');
+  const c=document.createElement('div'); c.className='fxbox';
+  c.innerHTML=`<h4>${f.name}<span class="st" id="st-${f.id}"></span></h4><div class="knobs"></div>`;
   fxgrid.appendChild(c); fxCards[f.id]=c;
-  f.ps.forEach(p=>{
-    valEls[p.id]=c.querySelector('#v-'+p.id);
-    const inp=c.querySelector('#k-'+p.id);
-    inp.addEventListener('input',()=>setParam(p.id,p.ui?p.ui.from(+inp.value):+inp.value));
-    inp.addEventListener('dblclick',()=>{ const fp=sel.fam.p; setParam(p.id, fp&&fp[p.id]!==undefined?fp[p.id]:p.v); });
-  });
+  const k=c.querySelector('.knobs');
+  f.ps.forEach(p=>makeKnob(k,p,true,fxHelp,{t:f.name+' · '+p.name,d:f.d}));
+  c.querySelector('h4').addEventListener('pointerenter',()=>help(fxHelp,f.name,f.d));
 });
 function fxState(){ FX.forEach(f=>{ const m=sel.P[f.ps[0].id]; fxCards[f.id].classList.toggle('active',m>0); $('st-'+f.id).textContent=m>0?Math.round(m)+' %':'OFF'; }); }
 function setParam(id,v){
   sel.P[id]=v;
   const p=ALLP.find(x=>x.id===id);
-  valEls[id].textContent=p.fmt(v);
-  const inp=$('k-'+id), uv=p.ui?p.ui.to(v):v; if(Math.abs(+inp.value-uv)>1e-9) inp.value=uv;
+  KN[id](v);
   if(id==='vol'||FXP.includes(p)){ applyLayerFx(sel); fxState(); }
   save();
 }
 function syncFaders(){
-  ALLP.forEach(p=>{ $('k-'+p.id).value=p.ui?p.ui.to(sel.P[p.id]):sel.P[p.id]; valEls[p.id].textContent=p.fmt(sel.P[p.id]); });
+  ALLP.forEach(p=>KN[p.id](sel.P[p.id]));
   $('selname').textContent=sel.name; $('fxname').textContent=sel.name; fxState();
 }
 
@@ -393,7 +447,7 @@ function syncFaders(){
 const layersEl=$('layers');
 layers.forEach(L=>{
   const c=document.createElement('div'); c.className='chip'; c.dataset.l=L.id;
-  c.innerHTML=`<button type="button" class="name">${L.name}</button><button type="button" class="pw" aria-label="Entendre la couche ${L.name}">ON</button>`;
+  c.innerHTML=`<button type="button" class="name">${L.name}</button><button type="button" class="pw" aria-label="Hear the ${L.name} layer">ON</button>`;
   c.querySelector('.name').addEventListener('click',()=>{ selectLayer(L); if(!L.on) setOn(L,true); });
   c.querySelector('.pw').addEventListener('click',()=>setOn(L,!L.on));
   layersEl.appendChild(c); L.chip=c;
@@ -517,7 +571,7 @@ playBtn.addEventListener('click',async()=>{
   if(ctx.state!=='running') await ctx.resume();
   playing=!playing;
   playBtn.setAttribute('aria-pressed',playing);
-  playBtn.textContent=playing?'■ Stop':'▶ Jouer';
+  playBtn.textContent=playing?'■ Stop':'▶ Play';
   lastTick=ctx.currentTime; layers.forEach(l=>l.nextT=ctx.currentTime+0.03);
 });
 document.addEventListener('keydown',e=>{ if(e.code==='Space'&&!/INPUT|BUTTON/.test(e.target.tagName)){ e.preventDefault(); playBtn.click(); }});
@@ -525,15 +579,15 @@ document.addEventListener('keydown',e=>{ if(e.code==='Space'&&!/INPUT|BUTTON/.te
 // ---------- loading ----------
 async function loadFile(f){
   if(!f) return;
-  $('srcname').textContent='Décodage…';
+  $('srcname').textContent='Decoding…';
   try{
     const ab=await f.arrayBuffer();
     const b=await new Promise((res,rej)=>{ const p=ctx.decodeAudioData(ab,res,rej); if(p&&p.catch) p.catch(rej); });
     setBuffer(b,f.name);
-  }catch(e){ $('srcname').textContent='Format illisible. Essaie un WAV, MP3, OGG ou M4A.'; }
+  }catch(e){ $('srcname').textContent='Unreadable format. Try WAV, MP3, OGG or M4A.'; }
 }
 $('file').addEventListener('change',e=>loadFile(e.target.files[0]));
-$('sample').addEventListener('click',()=>setBuffer(makeSample(),"Exemple : break + nappe, 4 s"));
+$('sample').addEventListener('click',()=>setBuffer(makeSample(),"Example: break + pad, 4 s"));
 const screen=$('screen'), drop=$('drop'); let dragDepth=0;
 screen.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;drop.hidden=false;});
 screen.addEventListener('dragover',e=>e.preventDefault());
@@ -612,7 +666,7 @@ function draw(){
 }
 
 resize();
-setBuffer(makeSample(),"Exemple : break + nappe, 4 s");
+setBuffer(makeSample(),"Example: break + pad, 4 s");
 renderChips();
 requestAnimationFrame(draw);
 })();
